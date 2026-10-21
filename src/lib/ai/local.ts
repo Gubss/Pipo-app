@@ -61,7 +61,7 @@ const STOP = /\b(domingo|segunda|terca|quarta|quinta|sexta|sabado|hoje|amanha|de
 /** "tenho casamento do Pedro domingo" -> "Casamento do Pedro". */
 export function titleFrom(text: string, t: EventTemplate): string {
   const norm = stripAccents(text.toLowerCase());
-  const m = norm.match(t.match);
+  const m = t.id === GENERIC_TEMPLATE.id ? genericStart(norm) : norm.match(t.match);
   if (!m || m.index === undefined) return t.title;
   let rest = text.slice(m.index);
   const cut = stripAccents(rest.toLowerCase()).slice(m[0].length).search(STOP);
@@ -69,8 +69,19 @@ export function titleFrom(text: string, t: EventTemplate): string {
   rest = rest.replace(/[\s,.;:!?-]+$/, '').replace(/\b(minha|meu)\s+/gi, '').trim();
   if (rest.length < 3 || rest.length > 50) return t.title;
   // Só a palavra-chave ("vacina", "médico") fica genérica demais: usa o título do modelo.
-  if (rest.split(/\s+/).length === 1 && t.id !== 'casamento' && t.id !== 'festa') return t.title;
+  if (rest.split(/\s+/).length === 1 && t.id !== 'casamento' && t.id !== 'festa' && t.id !== GENERIC_TEMPLATE.id) return t.title;
   return rest.charAt(0).toUpperCase() + rest.slice(1);
+}
+
+/** No genérico, o título é a própria frase sem "tenho que", "preciso" etc. */
+function genericStart(norm: string): RegExpMatchArray | null {
+  const lead = norm.match(/^\s*(?:(?:eu\s+)?(?:tenho\s+(?:que\s+|um\s+|uma\s+)?|preciso\s+(?:de\s+)?|vou\s+(?:ter\s+(?:um\s+|uma\s+)?)?|lembrar\s+de\s+|me\s+lembra\s+de\s+))?/);
+  const start = lead ? lead[0].length : 0;
+  const word = norm.slice(start).match(/^\S+/);
+  if (!word) return null;
+  const m = word as RegExpMatchArray;
+  m.index = start;
+  return m;
 }
 
 function replyFor(ev: DraftEvent, t: EventTemplate, req: InterpretRequest) {

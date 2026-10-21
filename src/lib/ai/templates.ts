@@ -103,7 +103,7 @@ export const TEMPLATES: EventTemplate[] = [
     kind: 'pet',
     emoji: '🐶',
     title: 'Vacina do pet',
-    match: /\bvacina\b.*\b(cachorro|cachorra|gato|gata|pet|dog|cao|filhote)|\b(cachorro|cachorra|gato|gata|pet|dog|cao)\b.*\bvacina|\bv10\b|\bv8\b|antirrabica|vermifugo|veterinari/,
+    match: /\bvacina\b.*\b(cachorro|cachorra|gato|gata|pet|dog|cao|filhote)|\b(cachorro|cachorra|gato|gata|pet|dog|cao)\b.*\bvacina|\bv10\b|\bv8\b|antirrabica|vermifugo|veterinari|\blevar .{1,25}\b(pra|para|pro|a|ao) (vacinar|vacina\b|tomar vacina)/,
     needsTime: true,
     allDay: false,
     repeatYearly: true,
