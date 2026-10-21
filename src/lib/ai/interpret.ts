@@ -1,4 +1,5 @@
-import { interpretWithClaude } from './claude';
+import { fromModelJson, interpretWithClaude } from './claude';
+import { buildUserMessage, OUTPUT_SCHEMA, SYSTEM_PROMPT_COMPACT } from './prompt';
 import { interpretLocal } from './local';
 import type { InterpretOptions, InterpretRequest, InterpretResponse } from './types';
 
@@ -6,7 +7,8 @@ import type { InterpretOptions, InterpretRequest, InterpretResponse } from './ty
  * Ponto de entrada único do app.
  * - endpoint: POST no backend (caminho de produção, a chave fica no servidor).
  * - apiKey sem endpoint: chama o Claude direto do aparelho. SÓ PARA TESTE PESSOAL, não publique assim.
- * - nenhum dos dois, ou qualquer falha: regras locais (funciona offline).
+ * - onDevice: modelo do próprio celular (grátis, offline, exige dev build).
+ * - nenhum, ou qualquer falha: regras locais (funciona offline).
  */
 export async function interpret(req: InterpretRequest, opts: InterpretOptions = {}): Promise<InterpretResponse> {
   try {
@@ -15,6 +17,12 @@ export async function interpret(req: InterpretRequest, opts: InterpretOptions = 
       return await interpretWithClaude(req, {
         apiKey: opts.apiKey, model: opts.model, timeoutMs: opts.timeoutMs, fetch: opts.fetch,
       });
+    }
+    if (opts.onDevice) {
+      const text = await opts.onDevice({
+        system: SYSTEM_PROMPT_COMPACT, user: buildUserMessage(req), schema: OUTPUT_SCHEMA as unknown as Record<string, unknown>,
+      });
+      return fromModelJson(req, text, 'device');
     }
   } catch (err) {
     if (typeof console !== 'undefined') console.warn('[ia-eventos] caindo nas regras locais:', String(err));

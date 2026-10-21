@@ -19,7 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Mascot, { MASCOT_NAME, type MascotMood } from '@/components/Mascot';
 import { Button, tap } from '@/components/ui';
-import { askPipo, draftToNewEvent, type DraftEvent, type DraftTask, type Turn } from '@/lib/assistant';
+import { askPipo, draftToNewEvent, rememberCorrection, type InterpretResponse, type DraftEvent, type DraftTask, type Turn } from '@/lib/assistant';
 import { useAuth } from '@/lib/auth';
 import { combine, formatDayLabel, formatLongDay } from '@/lib/dates';
 import { useEvents } from '@/lib/events';
@@ -57,6 +57,9 @@ export default function Chat() {
   const [voiceUri, setVoiceUri] = useState<string | undefined>();
   const [excluded, setExcluded] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
+  // Primeira frase da conversa e a última sugestão: base para o Pipo aprender ao salvar.
+  const firstText = useRef<string | null>(null);
+  const suggested = useRef<InterpretResponse | null>(null);
   const scrollRef = useRef<ScrollViewInstance>(null);
   const sentInitial = useRef(false);
 
@@ -88,12 +91,14 @@ export default function Chat() {
     push({ id: nextId(), from: 'user', text });
     setBusy(true);
     setMood('thinking');
+    if (firstText.current === null) firstText.current = text;
     try {
-      const res = await askPipo({ text, history, draft, profile: account?.profile, events });
+      const res = await askPipo({ text, history, draft, profile: account?.profile, events, userId: account?.id });
       setHistory((h) => [...h, { role: 'user', content: text }, { role: 'assistant', content: res.mascotReply }]);
       push({ id: nextId(), from: 'pipo', text: res.mascotReply });
       if (res.status === 'ready' && res.event?.date) {
         setDraft(res.event);
+        suggested.current = res;
         setExcluded({});
         push({ id: nextId(), from: 'plan', event: res.event, tasks: res.tasks });
         setMood('happy');
@@ -118,6 +123,13 @@ export default function Chat() {
     try {
       const chosen = tasks.filter((_, i) => !excluded[`${planId}:${i}`]);
       const created = await addEvent(draftToNewEvent(event, chosen, voiceUri));
+      if (account && suggested.current) {
+        rememberCorrection(account.id, { text: firstText.current ?? event.title, suggested: suggested.current, event, tasks: chosen }).catch(
+          () => {},
+        );
+      }
+      firstText.current = null;
+      suggested.current = null;
       setMessages((prev) => [
         ...prev.filter((m) => m.id !== planId),
         { id: nextId(), from: 'saved', eventId: created.id },

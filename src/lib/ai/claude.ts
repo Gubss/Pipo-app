@@ -61,21 +61,7 @@ export async function interpretWithClaude(req: InterpretRequest, opts: ClaudeCal
   if (response.stop_reason === 'max_tokens') throw new ClaudeOutputError('max_tokens');
 
   const text = response.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('');
-  let out: ModelOutput;
-  try {
-    out = JSON.parse(text) as ModelOutput;
-  } catch {
-    throw new ClaudeOutputError('invalid_json');
-  }
-
-  const result = finalize(
-    req,
-    out.status === 'not_an_event' ? null : out.event,
-    out.tasks ?? [],
-    out.mascotReply,
-    out.followUpQuestions ?? [],
-    'claude',
-  );
+  const result = fromModelJson(req, text, 'claude');
   result.usage = {
     model: response.model,
     inputTokens: response.usage.input_tokens + (response.usage.cache_creation_input_tokens ?? 0),
@@ -83,4 +69,22 @@ export async function interpretWithClaude(req: InterpretRequest, opts: ClaudeCal
     cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
   };
   return result;
+}
+
+/** Converte o JSON de qualquer modelo (Claude ou modelo do aparelho) na resposta final, validada pelo código. */
+export function fromModelJson(req: InterpretRequest, text: string, source: InterpretResponse['source']): InterpretResponse {
+  let out: ModelOutput;
+  try {
+    out = JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, '')) as ModelOutput;
+  } catch {
+    throw new ClaudeOutputError('invalid_json');
+  }
+  return finalize(
+    req,
+    out.status === 'not_an_event' ? null : out.event,
+    out.tasks ?? [],
+    out.mascotReply,
+    out.followUpQuestions ?? [],
+    source,
+  );
 }

@@ -4,6 +4,8 @@
  */
 
 /** Mesmos valores do EventKind do app (lembra-app/src/lib/types.ts). */
+import type { LocalMemory } from './memory';
+
 export type EventKind =
   | 'casamento'
   | 'aniversario'
@@ -58,6 +60,8 @@ export type Habit = {
 /** O evento sendo montado. Campos que faltam vêm como null. */
 export type DraftEvent = {
   title: string;
+  /** Modelo da biblioteca usado (ex.: "casamento", "pet-vacina"). Ajuda o aprendizado offline. */
+  templateId?: string | null;
   kind: EventKind;
   emoji: string;
   /** AAAA-MM-DD ou null se a pessoa não disse o dia. */
@@ -114,6 +118,8 @@ export type InterpretRequest = {
   draft?: DraftEvent | null;
   knownEvents?: EventSummary[];
   habits?: Habit[];
+  /** O que o modo offline aprendeu com a pessoa (ver learnFromCorrection). */
+  memory?: LocalMemory;
 };
 
 export type InterpretResponse = {
@@ -124,7 +130,7 @@ export type InterpretResponse = {
   event: DraftEvent | null;
   tasks: DraftTask[];
   /** Quem respondeu: o Claude, ou as regras locais (offline / falha). */
-  source: 'claude' | 'local';
+  source: 'claude' | 'device' | 'local';
   usage?: { model: string; inputTokens: number; outputTokens: number; cacheReadTokens: number };
 };
 
@@ -139,6 +145,12 @@ export type InterpretOptions = {
   model?: string;
   /** Tempo máximo da chamada remota antes de cair nas regras locais. */
   timeoutMs?: number;
+  /**
+   * Modelo de linguagem do próprio aparelho (Apple Foundation Models, Gemini Nano...).
+   * Recebe o prompt e o JSON Schema e devolve o texto JSON. Exige dev build (não roda no Expo Go).
+   * Se falhar ou devolver lixo, cai nas regras locais.
+   */
+  onDevice?: (prompt: { system: string; user: string; schema: Record<string, unknown> }) => Promise<string>;
   /** Injeção de fetch para testes. */
   fetch?: typeof fetch;
 };

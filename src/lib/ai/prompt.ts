@@ -71,7 +71,7 @@ export const OUTPUT_SCHEMA = {
  * Prompt de sistema. Fica idêntico entre chamadas para aproveitar o cache de prompt:
  * nada de data, nome ou hábitos aqui (isso vai na mensagem do usuário).
  */
-export const SYSTEM_PROMPT = `Você é o mascote de um app brasileiro de lembretes. A pessoa joga uma frase solta, escrita ou ditada por voz ("casamento domingo", "levar o Thor pra vacinar mês que vem"), e você transforma isso em um evento no calendário e num checklist de preparação com lembretes, para ela não chegar lá e se dar mal (sem presente, sem cortar o cabelo, sem terno alugado).
+const CORE_PROMPT = `Você é o mascote de um app brasileiro de lembretes. A pessoa joga uma frase solta, escrita ou ditada por voz ("casamento domingo", "levar o Thor pra vacinar mês que vem"), e você transforma isso em um evento no calendário e num checklist de preparação com lembretes, para ela não chegar lá e se dar mal (sem presente, sem cortar o cabelo, sem terno alugado).
 
 ## Seu jeito
 Português do Brasil, informal, carinhoso e com humor leve, como um amigo que não esquece nada. Frases curtas: mascotReply tem no máximo 2 frases. Pode usar 1 emoji. Nunca seja chato ou passivo-agressivo; a pessoa escolheu receber lembretes.
@@ -97,11 +97,16 @@ Português do Brasil, informal, carinhoso e com humor leve, como um amigo que n�
 5. Conversa em várias falas: se vier um "rascunho atual", a pessoa está respondendo sua pergunta. Complete o rascunho (mantenha título e tarefas, a não ser que ela mude algo) em vez de começar outro evento. Se ela claramente falar de um evento novo, comece do zero.
 6. Se já existir um evento igual na lista de eventos conhecidos, avise com leveza no mascotReply em vez de duplicar sem comentar.
 
-## Modelos de referência
+`;
+
+export const SYSTEM_PROMPT = `${CORE_PROMPT}## Modelos de referência
 Use como ponto de partida e adapte ao caso (não copie às cegas):
 ${templatesForPrompt()}
 
 Responda apenas no formato JSON pedido.`;
+
+/** Versão sem a biblioteca de modelos, para modelos do aparelho com contexto pequeno (o da Apple tem ~4 mil tokens). */
+export const SYSTEM_PROMPT_COMPACT = `${CORE_PROMPT}Responda apenas no formato JSON pedido.`;
 
 /** Mensagem do usuário: contexto que muda a cada chamada + a fala atual. */
 export function buildUserMessage(req: InterpretRequest): string {
@@ -117,6 +122,8 @@ export function buildUserMessage(req: InterpretRequest): string {
   if (req.userName) lines.push(`Nome da pessoa: ${req.userName}.`);
   if (req.city) lines.push(`Cidade: ${req.city}.`);
   if (req.mascotName) lines.push(`Seu nome (mascote): ${req.mascotName}.`);
+  if (req.memory?.pets.length) lines.push(`Pets da pessoa: ${req.memory.pets.join(', ')}.`);
+  if (req.memory?.people.length) lines.push(`Pessoas que ela já citou: ${req.memory.people.slice(-15).join(', ')}.`);
   if (req.habits?.length) {
     lines.push('Hábitos que o app aprendeu:');
     for (const h of req.habits.slice(0, 15)) {

@@ -20,6 +20,50 @@ const MONTHS = [
   'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
 ];
 
+const NUMBER_WORDS: Record<string, number> = {
+  um: 1, uma: 1, dois: 2, duas: 2, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10,
+  onze: 11, doze: 12, quinze: 15, vinte: 20, trinta: 30,
+};
+
+function nthWeekday(y: number, m0: number, weekday: number, n: number) {
+  const first = new Date(Date.UTC(y, m0, 1)).getUTCDay();
+  return fromUtc(Date.UTC(y, m0, 1 + ((weekday - first + 7) % 7) + 7 * (n - 1)));
+}
+
+/** Domingo de Páscoa (algoritmo de Meeus). */
+function easter(y: number) {
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1;
+  return fromUtc(Date.UTC(y, month - 1, day));
+}
+
+const HOLIDAYS: [RegExp, (y: number) => string][] = [
+  [/\bnatal\b|amigo (secreto|oculto)/, (y) => `${y}-12-25`],
+  [/ano novo|reveillon|virada do ano/, (y) => `${y}-12-31`],
+  [/dia dos namorados/, (y) => `${y}-06-12`],
+  [/dia das criancas/, (y) => `${y}-10-12`],
+  [/dia das maes/, (y) => nthWeekday(y, 4, 0, 2)],
+  [/dia dos pais/, (y) => nthWeekday(y, 7, 0, 2)],
+  [/\bpascoa\b/, (y) => easter(y)],
+  [/\bcarnaval\b/, (y) => addDays(easter(y), -47)],
+  [/finados/, (y) => `${y}-11-02`],
+  [/tiradentes/, (y) => `${y}-04-21`],
+  [/sete de setembro|independencia/, (y) => `${y}-09-07`],
+];
+
+/** Natal, dia das mães, Páscoa... sempre a próxima ocorrência. */
+function holidayDate(t: string, today: string): string | null {
+  const y = Number(today.slice(0, 4));
+  for (const [re, f] of HOLIDAYS) {
+    if (!re.test(t)) continue;
+    const d = f(y);
+    return d >= today ? d : f(y + 1);
+  }
+  return null;
+}
+
 export const WEEKDAY_LONG = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
 
 export function pad(n: number) {
@@ -94,10 +138,21 @@ export function parseDatePt(text: string, today: string): string | null {
   if (/\bamanha\b/.test(t)) return addDays(today, 1);
   if (/\bhoje\b/.test(t)) return today;
 
-  const daqui = t.match(/\b(?:daqui a|em)\s+(\d{1,3})\s+dias?\b/);
-  if (daqui) return addDays(today, Number(daqui[1]));
-  const semanas = t.match(/\b(?:daqui a|em)\s+(\d{1,2})\s+semanas?\b/);
-  if (semanas) return addDays(today, 7 * Number(semanas[1]));
+  const rel = t.match(/\b(?:daqui a|daqui|em|dentro de)\s+(\d{1,3}|[a-z]+)\s+(dias?|semanas?|mes|meses)\b/);
+  const relN = rel ? (/^\d/.test(rel[1]) ? Number(rel[1]) : NUMBER_WORDS[rel[1]]) : undefined;
+  if (rel && relN) {
+    if (rel[2].startsWith('dia')) return addDays(today, relN);
+    if (rel[2].startsWith('semana')) return addDays(today, 7 * relN);
+    return makeDate(ty, tm - 1 + relN, Number(today.slice(8))) ?? addDays(today, 30 * relN);
+  }
+
+  const holiday = holidayDate(t, today);
+  if (holiday) return holiday;
+
+  if (/\b(fim|final) do mes\b/.test(t)) {
+    const next = /(mes que vem|proximo mes)/.test(t) ? 1 : 0;
+    return fromUtc(Date.UTC(ty, tm + next, 0));
+  }
 
   // 24/10 ou 24/10/2026
   const slash = t.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
@@ -155,19 +210,35 @@ export function parseDatePt(text: string, today: string): string | null {
 
 /** Acha um horário na frase. Devolve "HH:MM" ou null. */
 export function parseTimePt(text: string): string | null {
-  const t = stripAccents(text.toLowerCase());
+  const t = stripAccents(text.toLowerCase())
+    .replace(/\b(uma|duas|tres|quatro|cinco|seis|sete|oito|nove|dez|onze|doze)\b(?=\s*(?:e (?:meia|quinze|trinta)|horas?|h\b|da (?:manha|tarde|noite)))/g, (w) => String(NUMBER_WORDS[w] ?? (w === 'onze' ? 11 : 12)));
+  if (/meio[- ]dia e meia/.test(t)) return '12:30';
   if (/meio[- ]dia/.test(t)) return '12:00';
   if (/meia[- ]noite/.test(t)) return '00:00';
 
-  const m =
-    t.match(/\b(?:as?\s+)?(\d{1,2})[:h](\d{2})\b/) ||
-    t.match(/\b(?:as?\s+)?(\d{1,2})\s?(?:h|hs|horas?)\b/) ||
-    t.match(/\b(\d{1,2})\s+(?=da (?:manha|tarde|noite))/) ||
-    t.match(/\bas\s+(\d{1,2})\b/);
-  if (!m) return null;
-  let h = Number(m[1]);
-  const min = m[2] ? Number(m[2]) : 0;
+  let m: RegExpMatchArray | null;
+  let h: number, min: number;
+  let bare = false; // "às 4", "4 e meia": hora sem h/min e sem período
+  if ((m = t.match(/\b(\d{1,2})[:h](\d{2})\b/))) {
+    h = Number(m[1]); min = Number(m[2]);
+  } else if (
+    (m = t.match(/\bas?\s+(\d{1,2})\s*(?:h|hs|horas?)?\s+e\s+(meia|quinze|trinta|\d{2})\b/)) ||
+    (m = t.match(/\b(\d{1,2})\s*(?:h|hs|horas?)\s+e\s+(meia|quinze|trinta|\d{2})\b/)) ||
+    (m = t.match(/\b(\d{1,2})\s+e\s+(meia|quinze)\b/))
+  ) {
+    h = Number(m[1]);
+    min = m[2] === 'meia' || m[2] === 'trinta' ? 30 : m[2] === 'quinze' ? 15 : Number(m[2]);
+    bare = true;
+  } else if ((m = t.match(/\b(\d{1,2})\s?(?:h|hs|horas?)\b/))) {
+    h = Number(m[1]); min = 0;
+  } else if ((m = t.match(/\b(\d{1,2})\s+(?=da (?:manha|tarde|noite))/)) || (m = t.match(/\bas\s+(\d{1,2})\b/))) {
+    h = Number(m[1]); min = 0; bare = true;
+  } else {
+    return null;
+  }
   if (/(da tarde|da noite)/.test(t) && h < 12) h += 12;
+  // "dentista às 4" quase sempre é à tarde; madrugada só se a pessoa disser.
+  else if (bare && h >= 1 && h <= 6 && !/(da manha|madrugada|cedo)/.test(t)) h += 12;
   if (h > 23 || min > 59) return null;
   return `${pad(h)}:${pad(min)}`;
 }

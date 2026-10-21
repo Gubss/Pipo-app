@@ -96,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const accounts = await readJson<Account[]>(keys.accounts, []);
     await writeJson(keys.accounts, accounts.filter((a) => a.id !== account.id));
     await removeKey(keys.events(account.id));
+    await removeKey(keys.memory(account.id));
     await removeSecret(keys.session);
     setAccount(null);
   }, [account]);

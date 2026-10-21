@@ -1,9 +1,9 @@
-import { interpret } from './ai';
+import { emptyMemory, interpret, learnFromCorrection, type LocalMemory } from './ai';
 import type { DraftEvent, DraftTask, InterpretResponse, Turn } from './ai/types';
 import { combine, toDateKey } from './dates';
 import { learnedHabits } from './habits';
 import type { NewEvent } from './events';
-import { keys, readSecret } from './storage';
+import { keys, readJson, readSecret, writeJson } from './storage';
 import type { AppEvent, Profile } from './types';
 
 export type { DraftEvent, DraftTask, InterpretResponse, Turn };
@@ -15,8 +15,10 @@ export async function askPipo(args: {
   draft: DraftEvent | null;
   profile?: Profile;
   events: AppEvent[];
+  userId?: string;
 }): Promise<InterpretResponse> {
   const apiKey = (await readSecret(keys.aiKey)) ?? undefined;
+  const memory = args.userId ? await loadMemory(args.userId) : undefined;
   return interpret(
     {
       text: args.text,
@@ -28,9 +30,29 @@ export async function askPipo(args: {
       draft: args.draft,
       habits: learnedHabits(args.events),
       knownEvents: args.events.slice(-30).map((e) => ({ title: e.title, kind: e.kind, date: toDateKey(new Date(e.startsAt)) })),
+      memory,
     },
     { apiKey, timeoutMs: 20000 },
   );
+}
+
+/** O que o Pipo aprendeu com as correções da pessoa (fica só no aparelho). */
+function loadMemory(userId: string) {
+  return readJson<LocalMemory>(keys.memory(userId), emptyMemory());
+}
+
+/** Chamado ao salvar: compara a sugestão com o que a pessoa manteve e guarda o aprendizado. */
+export async function rememberCorrection(
+  userId: string,
+  input: { text: string; suggested: InterpretResponse; event: DraftEvent; tasks: DraftTask[] },
+) {
+  const memory = await loadMemory(userId);
+  const next = learnFromCorrection(memory, {
+    text: input.text,
+    suggested: input.suggested,
+    saved: { event: input.event, tasks: input.tasks.map(({ title, emoji, dueAt, offset }) => ({ title, emoji, dueAt, offset })) },
+  });
+  await writeJson(keys.memory(userId), next);
 }
 
 function localToIso(local: string) {

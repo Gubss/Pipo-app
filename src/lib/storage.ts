@@ -41,4 +41,5 @@ export const keys = {
   session: 'lembra.session',
   aiKey: 'lembra.aiKey',
   events: (userId: string) => `lembra.events.${userId}`,
+  memory: (userId: string) => `lembra.memory.${userId}`,
 };
