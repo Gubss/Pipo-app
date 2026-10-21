@@ -254,11 +254,11 @@ export default function Chat() {
             />
           )}
           {input.trim() && !recState.isRecording ? (
-            <Pressable onPress={() => send(input)} style={[styles.roundBtn, { backgroundColor: colors.primary }]}>
+            <Pressable accessibilityLabel="Enviar" onPress={() => send(input)} style={[styles.roundBtn, { backgroundColor: colors.primary }]}>
               <Ionicons name="arrow-up" size={22} color={colors.white} />
             </Pressable>
           ) : (
-            <Pressable onPress={toggleRecording} style={[styles.roundBtn, { backgroundColor: colors.purple }]}>
+            <Pressable accessibilityLabel={recState.isRecording ? 'Parar gravação' : 'Gravar áudio'} onPress={toggleRecording} style={[styles.roundBtn, { backgroundColor: colors.purple }]}>
               <Ionicons name={recState.isRecording ? 'stop' : 'mic'} size={22} color={colors.white} />
             </Pressable>
           )}

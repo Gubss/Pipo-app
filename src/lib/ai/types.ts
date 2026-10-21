@@ -106,6 +106,8 @@ export type InterpretRequest = {
   timezone?: string;
   userName?: string;
   city?: string;
+  /** Nome do bichinho, para ele falar de si mesmo. */
+  mascotName?: string;
   /** Falas anteriores desta conversa (sem a atual). */
   history?: Turn[];
   /** O rascunho devolvido na resposta anterior, para completar em vez de recomeçar. */

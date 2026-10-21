@@ -1,13 +1,9 @@
-// Provisório: substituído pelo módulo de IA (ia-eventos) quando chegar.
-import type { InterpretOptions, InterpretRequest, InterpretResponse } from './types';
-
-export async function interpret(req: InterpretRequest, _opts: InterpretOptions): Promise<InterpretResponse> {
-  return {
-    status: 'not_an_event',
-    mascotReply: `Anotei: "${req.text}". Meu cérebro ainda está chegando!`,
-    followUpQuestions: [],
-    event: null,
-    tasks: [],
-    source: 'local',
-  };
-}
+export * from './types';
+export { interpret } from './interpret';
+export { interpretLocal } from './local';
+export { interpretWithClaude, DEFAULT_MODEL } from './claude';
+export { learnHabits, dueHabits, habitKey, type CompletedItem } from './habits';
+export { transcribeAudio } from './transcribe';
+export { TEMPLATES, findTemplate } from './templates';
+export { parseDatePt, parseTimePt, scheduleTask, localNow } from './dates';
+// server.ts e cost.ts ficam fora do índice: não são usados dentro do app.

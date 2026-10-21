@@ -1,6 +1,7 @@
 import { interpret } from './ai';
 import type { DraftEvent, DraftTask, InterpretResponse, Turn } from './ai/types';
 import { combine, toDateKey } from './dates';
+import { learnedHabits } from './habits';
 import type { NewEvent } from './events';
 import { keys, readSecret } from './storage';
 import type { AppEvent, Profile } from './types';
@@ -25,6 +26,7 @@ export async function askPipo(args: {
       city: args.profile?.city,
       history: args.history,
       draft: args.draft,
+      habits: learnedHabits(args.events),
       knownEvents: args.events.slice(-30).map((e) => ({ title: e.title, kind: e.kind, date: toDateKey(new Date(e.startsAt)) })),
     },
     { apiKey, timeoutMs: 20000 },
